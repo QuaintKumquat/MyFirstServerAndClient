@@ -1,10 +1,15 @@
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Scanner;
+
+import javax.xml.bind.DatatypeConverter;
 
 public class Server3 {
 
@@ -43,12 +48,53 @@ public class Server3 {
 				System.out.println("Socket accepted.");
 				System.out.println(sock.isConnected()?"Socket connected.":"Socket not connected.");
 				
-				DataInputStream in = new DataInputStream(sock.getInputStream());
-				DataOutputStream out = new DataOutputStream(sock.getOutputStream());
-				//String input = in.readUTF();
-				//System.out.println("Client: "+input);
-				out.writeUTF("Hello!");
-				System.out.println("Server: Hello!");
+				InputStream in = sock.getInputStream();
+				OutputStream out = sock.getOutputStream();
+				Scanner scan = new Scanner(in,"UTF-8");
+				String key = "";
+				String input = "";
+				//handshake
+				boolean cont = true;
+				
+				while(cont){//key.equals("")){
+					//System.out.println("Next line...");
+					input = scan.nextLine();
+					if(input.matches("Sec-WebSocket-Key: .+")) key = input.substring(19);
+					System.out.println("Client: "+input);
+					cont = !input.equals("") && !input.equals(" ") && scan.hasNextLine();
+				}
+				//System.out.println("Closing scan");
+				//scan.close();
+				System.out.println("Recieved handshake");
+				String response = ""
+						+ "HTTP/1.1 101 Switching Protocols"+"\r\n"
+						+ "Upgrade: websocket"+"\r\n"
+						+ "Connection: Upgrade"+"\r\n"
+						+ "Sec-WebSocket-Accept: ";
+				
+				key+="258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+				System.out.println("key: "+key);
+				try {
+					response += DatatypeConverter.printBase64Binary(MessageDigest.getInstance("SHA1").digest(key.getBytes("UTF-8")))+"\r\n\r\n";
+				}catch (NoSuchAlgorithmException e){System.out.println("SHA1 no longer exists...");}
+				byte b[] = response.getBytes("UTF-8");
+				System.out.println("Response ready, "+b.length);
+				
+				out.write(b,0,b.length);
+				System.out.println("Shook hands");
+				//out.write((byte)(1));
+				//out.write((byte)(5 + 128));
+				//out.write("Hello".getBytes("UTF-8"));
+				//System.out.println("Server: Hello");
+				String data = "";
+				int dat = in.read();
+				while(dat != -1){
+					data+=dat+" ";
+					dat = in.read();
+				}
+				System.out.println("Client: "+ data);
+				//out.writeUTF("Hello!");
+				//System.out.println("Server: Hello!");
 					
 				
 				//input = in.readUTF();
@@ -58,6 +104,7 @@ public class Server3 {
 			}
 			catch(IOException e){
 				System.out.println("IOException during accept()");
+				e.printStackTrace();
 			}
 			
 			try {
